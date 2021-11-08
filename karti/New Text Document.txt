@@ -1,0 +1,543 @@
+var request = require("request");
+
+var service_api = "localhost:8081";
+if (process.env.KARTI_API_URL) {
+  service_api = process.env.KARTI_API_URL;
+}
+var base_url = "http://" + service_api + "/KartetniWS/rest/";
+var test_api = "http://" + service_api + "/KartetniWSTest/rest/";
+
+var orange_api = "http://10.10.60.60:8080/"
+if (process.env.ORANGE_INTERNET_API_BASE_URL) {
+  orange_api = process.env.ORANGE_INTERNET_API_BASE_URL;
+}
+
+console.log("Calling Service: " + base_url);
+
+var options = {
+  headers: {
+    //We can define headers too
+    "Content-Type": "application/json"
+  }
+};
+
+var API = function (base_api_url, lang, access_token) {
+  // if (!(lang == "en" || lang == "ar")) lang = "en";
+
+  options.headers["lang"] = lang;
+  if (access_token) {
+    options.headers["AccessToken"] = access_token;
+  }
+
+  var methods = {
+    login: function (data, next) {
+      options.method = "POST";
+      options.json = data;
+
+      options.url = base_url + "profile/login/" + lang;
+
+      console.log(options);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+    register: function (data, next) {
+      options.method = "POST";
+      options.json = data;
+      options.url = base_url + "profile/regestration/" + lang;
+      request(options, function (error, response, body) {
+        console.log(error, body);
+        next(error, parse_result(body));
+      });
+    },
+
+    getCountries: function (next, usOnly) {
+      options.method = "GET";
+      options.url =
+        base_url +
+        "lookup/countries/" +
+        lang +
+        (usOnly ? "?countrySpecific=1" : "");
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+    getOperators: function (next) {
+      options.method = "GET";
+      delete options.json;
+      options.url = base_url + "lookup/operators/" + lang;
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+    activate: function (email, code, next) {
+      options.method = "GET";
+      delete options.json;
+      options.url =
+        base_url +
+        "profile/activation/" +
+        lang +
+        "?activationCode=" +
+        code +
+        "&email=" +
+        email;
+
+      console.log("Activation Request", options);
+      request(options, function (error, response, body) {
+        console.log("Activation Result = ", error, body);
+        next(error, parse_result(body));
+      });
+    },
+
+    resendActivationEmail: function (email, next) {
+      options.method = "GET";
+      delete options.json;
+      options.url =
+        base_url + "profile/resendActivation/" + lang + "?emailId=" + email;
+
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+
+    checkIfActivated: function (email, next) {
+      options.method = "GET";
+      delete options.json;
+      options.url =
+        base_url + "profile/chkActivation/" + lang + "?emailId=" + email;
+
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+
+    getCardTypes: function (operator_id, next) {
+      options.method = "GET";
+      options.url =
+        base_url + "lookup/cardType/" + lang + "?opId=" + operator_id;
+      console.log(options.url);
+      console.log("getCardTypes request: ");
+      console.log(options);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+
+    getCardDenom: function (card_type, next) {
+      options.method = "GET";
+      options.url =
+        base_url + "lookup/cardDenom/" + lang + "?cardType=" + card_type;
+
+      console.log(options.url);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+
+    quickBuyCardPrices: function (countryCode, opId, cardType, next) {
+      options.method = "GET";
+
+      options.url =
+        base_url +
+        "lookup/quickBuyCardPrices/" +
+        lang +
+        "?" +
+        "countryCode=" +
+        countryCode +
+        "&" +
+        "cardType=" +
+        cardType +
+        "&" +
+        "opId=" +
+        opId;
+
+      console.log("quickBuyCardPrices: " + options.url);
+      console.log(options);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+
+    getCardPrices: function (card_type, email, next) {
+      options.method = "GET";
+
+      options.url =
+        base_url +
+        "lookup/cardPrices/" +
+        lang +
+        "?" +
+        "cardType=" +
+        card_type +
+        "&emailId=" +
+        email;
+      console.log(options.url);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+    checkBilling: function (purchase_id, next) {
+      options.method = "GET";
+      options.url =
+        base_url + "purchase/chkBilling/" + lang + "?purchaseId=" + purchase_id;
+      console.log(options.url);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+    purchase: function (
+      email,
+      autho_token,
+      cardBrandId,
+      denomId,
+      denomprice,
+      phone,
+      country,
+      operator,
+      user_agent,
+      header_enrichment,
+      user_type,
+      user_ip,
+      next
+    ) {
+      options.method = "POST";
+
+      user_agent = user_agent
+        ? user_agent
+        : "Mozilla/5.0 (Linux; Android 7.0; TRT-L21A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.90 Mobile Safari/537.36";
+
+      if (user_type == "loyal" || user_type == "retailer") {
+        options.json = {
+          userSource: "2",
+          userOs: user_agent,
+          userPaymentMethod: "1",
+          userConnectionType: phone ? "2" : "1",
+          cardBrandId: cardBrandId + "",
+          denomId: denomId + "",
+          operatorType: user_type == "loyal" ? 3 : 2
+          //  userIP: user_ip
+        };
+        options.url = base_url + "purchase/special-user-purchase/" + lang;
+      } else {
+        if (!header_enrichment) {
+          //wifi
+          options.url = base_url + "purchase/sendOTP/" + lang;
+        } else {
+          //3g
+          options.url = base_url + "purchase/headerEnrichmentCharge/" + lang;
+        }
+        //     options.headers['Authentication'] = autho_token;
+        if (!user_ip) {
+          user_ip = "188.247.77.28";
+        }
+        options.json = {
+          userId: email,
+          cardBrandId: cardBrandId + "",
+          denomId: denomId + "",
+          userSource: "2",
+          userOs: user_agent,
+          userPaymentMethod: "1",
+          userConnectionType: phone ? "2" : "1",
+          userIP: user_ip.replace(/^.*:/, "")
+        };
+
+        options.json["countryCode"] = country;
+        if (header_enrichment) {
+          options.json["operatorId"] = operator;
+        } else {
+          options.json["operatorCode"] = operator;
+        }
+        options.json["msisdn"] =
+          (header_enrichment || operator == 69 /*Orange Internet*/
+            ? ""
+            : country) + phone;
+      }
+      console.log(options);
+
+      request(options, function (error, response, body) {
+        /* if (phone == 1234566) {
+          var xl_sample_response = {
+            status: "succsess",
+            message: null,
+            object: null,
+            LoyaltyCards: null,
+            errorCode: 0,
+            token: null,
+            cgUrl:
+              "https://www.dot-jo.biz/operator-consent-page-subscrption?partner_id=karti-fedbf039&service_id=karti&op_id=66&signature=78f3c0d017d5d8b0b9313d34c92a4e7916e9355f6f243aa7849ee8640d4ffe70&partner_txid=1562227495921-5f1a7820&rurl=https://dot-jo.biz/xl-karti-redirection/"
+          };
+          return next(null, xl_sample_response);
+        }*/
+        next(error, parse_result(body));
+      });
+    },
+    getOrangeInternetMSISDN: function( accountNumber ,nationalId, next){
+      accountNumber = accountNumber.replace("INT" , "")
+      const options = {
+        url:    orange_api+"orange-internet-auth-api-wrapper/user-data/"+accountNumber+"/"+nationalId,
+        method: "GET"
+      }
+      
+
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      })
+    },
+
+    quickPurchase: function (
+      email,
+      cardBrandId,
+      denomId,
+      denomprice,
+      phone,
+      country,
+      operator,
+      user_agent,
+      user_ip,
+      next
+    ) {
+      options.method = "POST";
+      options.url = base_url + "purchase/quickBuySendOTP/" + lang;
+      options.json = {
+        userId: email,
+        cardBrandId: cardBrandId + "",
+        denomId: denomId + "",
+        userSource: "2",
+        userOs: user_agent,
+        userPaymentMethod: "1",
+        userConnectionType: phone ? "2" : "1",
+        userIP: user_ip.replace(/^.*:/, "")
+      };
+
+      options.json["countryCode"] = country;
+      options.json["operatorCode"] = operator;
+      options.json["msisdn"] = country + phone;
+
+      console.log("quickPurchase request: ");
+      console.log(options);
+
+      request(options, function (error, response, body) {
+        console.log("quickPurchase response: ");
+        console.log(error, body);
+        next(error, parse_result(body));
+      });
+    },
+
+    verifyPin: function (otp_id, pin, next) {
+      options.method = "POST";
+      options.url = base_url + "purchase/checkOTP/" + lang;
+      console.log(options.url);
+      options.json = {
+        otpId: otp_id,
+        pin: pin
+      };
+
+      console.log(options);
+      request(options, function (error, response, body) {
+        console.log("verifycode", error, body);
+        next(error, parse_result(body));
+      });
+    },
+
+    quickVerifyPin: function (otp_id, pin, next) {
+      options.method = "POST";
+      options.url = base_url + "purchase/quickBuyCheckOTP/" + lang;
+      console.log(options.url);
+      options.json = {
+        otpId: otp_id,
+        pin: pin
+      };
+
+      console.log("quickVerifyPin: " + options.url);
+      console.log(options);
+
+      request(options, function (error, response, body) {
+        console.log("quickVerifyPin", error, body);
+        next(error, parse_result(body));
+      });
+    },
+
+    updatePurchaseWifi: function (email, phone, country, operator, next) {
+      options.json = {
+        msisdn: phone,
+        countryCode: country,
+        operatorCode: operator,
+        userId: email
+      };
+
+      options.method = "POST";
+      options.url = base_url + "purchase/upPurchaseAtmWi/" + lang;
+
+      console.log(options);
+
+      request(options, function (error, response, body) {
+        console.log(error, body);
+        next(error, parse_result(body));
+      });
+    },
+    myCards: function (email, next) {
+      options.method = "GET";
+      options.url = base_url + "purchase/mycards/" + lang + "?emailId=" + email;
+      console.log(options);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+
+    cardInfo: function (purchase_id, next) {
+      options.method = "GET";
+      options.url =
+        base_url +
+        "purchase/mycardsDetails/" +
+        lang +
+        "?purchaseId=" +
+        purchase_id;
+      console.log(options);
+      request(options, function (error, response, body) {
+        console.log("Card info", body);
+        next(error, parse_result(body));
+      });
+    },
+
+    showProfile: function (email, next) {
+      options.method = "POST";
+      options.url = base_url + "profile/showProfile/" + email + "/" + lang;
+      console.log(options);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+    editProfile: function (email, data, next) {
+      options.method = "POST";
+      options.json = data;
+      options.url = base_url + "profile/editProfile/" + email + "/" + lang;
+      console.log(options);
+      request(options, function (error, response, body) {
+        console.log(error, body);
+        next(error, parse_result(body));
+      });
+    },
+
+    sendResetLink: function (email, next) {
+      options.method = "POST";
+      options.json = {
+        emailId: email
+      };
+      options.url = base_url + "operation/callResetPassword/" + lang;
+      console.log(options);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+
+    changePassword: function (email, password, oldPassword, next) {
+      options.method = "POST";
+      options.json = {
+        emailId: email,
+        oldPassword: oldPassword,
+        password: password
+      };
+      //Used for change password, Do not ask me why!
+      options.url = base_url + "operation/resetPassword/" + lang;
+      console.log(options);
+      request(options, function (error, response, body) {
+        console.log("Reset : ", body);
+        next(error, parse_result(body));
+      });
+    },
+
+    resetPassword: function (email, password, token, next) {
+      options.method = "POST";
+      options.json = {
+        emailId: email,
+        password: password
+      };
+      options.url =
+        base_url + "operation/changePassword/" + lang + "?token=" + token;
+      console.log(options);
+      request(options, function (error, response, body) {
+        console.log("Reset : ", body);
+        next(error, parse_result(body));
+      });
+    },
+
+    contactUs: function (email, message, next) {
+      options.method = "POST";
+      options.json = {
+        emailId: email,
+        message: message
+      };
+      options.url = base_url + "operation/cotactUs/" + lang;
+      console.log(options);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+
+    notifications: function (email, next) {
+      options.method = "POST";
+      delete options.json;
+      options.url =
+        base_url + "operation/notifications/get/" + lang + "?email=" + email;
+      console.log(options);
+      request(options, function (error, response, body) {
+        next(error, parse_result(body));
+      });
+    },
+
+    setAccessToken: function (access_token) {
+      options.headers["AccessToken"] = access_token;
+    },
+
+    userBalance: function (operatorType, next) {
+      if (operatorType == 3 || operatorType == 2) {
+        options.method = "GET";
+        delete options.json;
+        options.url =
+          base_url +
+          "profile/special-user-balance/" +
+          operatorType +
+          "/" +
+          lang;
+        request(options, function (error, response, body) {
+          console.log("Balance", parse_result(body));
+          next(error, parse_result(body));
+        });
+      } else {
+        next("No balance", null);
+      }
+    }
+  };
+  return methods;
+};
+
+var parse_result = function (result) {
+  var res = {
+    status: "fail",
+    message: "",
+    object: null
+  };
+  if (result) {
+    try {
+      if (typeof result == "string") {
+        res = JSON.parse(result);
+      } else {
+        res = result;
+      }
+    } catch (e) {
+      res.message = result;
+      if (
+        result.indexOf("Problem") == -1 &&
+        result.indexOf("Error") == -1 &&
+        result.indexOf("Doctype") == -1 &&
+        result.indexOf("expired") == -1
+      ) {
+        res.status = "success";
+      }
+    }
+  }
+
+  //  console.log("API Result :- ", res);
+  return res;
+};
+
+module.exports = API;

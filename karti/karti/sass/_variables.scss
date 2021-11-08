@@ -1,0 +1,34 @@
+
+
+// Variables for SASS
+
+// Colors
+
+$color_default: #444242;
+$color_yellow: #ffb600;
+$color_orange: #dd461b;
+$color_black: #141414;
+$color_gray: #9a9a9a;
+$color_white: #fff;
+$color_text: $color_default;
+
+/* Using SCSS variables to store breakpoints */
+$breakpoint-mobile-small: 350px;
+$breakpoint-mobile-portrait: 500px;
+$breakpoint-desktop: 800px;
+
+
+// Fonts
+
+$font_default: 'Lato', sans-serif;
+$font_size_default: 15px;
+$font_black:900;
+$font_bold:700;
+$font_regular:400;
+$font_light:300;
+
+// Direction
+
+$right: right;
+$left: left;
+
